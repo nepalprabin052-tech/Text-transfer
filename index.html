@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Direct Text Transfer</title>
+  <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+  <style>
+    * { box-sizing: border-box; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
+    body { padding: 20px; max-width: 500px; margin: 0 auto; background: #f4f4f9; color: #333; }
+    h2 { margin-top: 0; color: #1a73e8; }
+    .card { background: #fff; padding: 15px; border-radius: 10px; box-shadow: 0 2px 8px rgba(0,0,0,0.1); margin-bottom: 15px; }
+    input, textarea, button { width: 100%; padding: 12px; margin-top: 8px; border-radius: 6px; border: 1px solid #ccc; font-size: 16px; }
+    button { background: #1a73e8; color: white; border: none; font-weight: bold; cursor: pointer; }
+    button:active { background: #1557b0; }
+    .received-box { background: #e8f0fe; border-left: 4px solid #1a73e8; padding: 12px; border-radius: 4px; white-space: pre-wrap; word-break: break-word; min-height: 80px; }
+    .status { font-size: 14px; font-weight: bold; margin-bottom: 10px; }
+    .connected { color: #2e7d32; }
+    .disconnected { color: #c62828; }
+  </style>
+</head>
+<body>
+
+  <h2>📱 Direct Text Transfer</h2>
+
+  <div class="card">
+    <div id="status" class="status disconnected">Status: Not Connected</div>
+    <label><b>1. Room Code:</b></label>
+    <input type="text" id="roomId" placeholder="e.g. phone123" value="phone123">
+    <button onclick="connectToRoom()">Connect Phones</button>
+  </div>
+
+  <div class="card">
+    <label><b>2. Send Text:</b></label>
+    <textarea id="textToSend" rows="4" placeholder="Paste or type text here..."></textarea>
+    <button onclick="sendText()">Send to Other Phone</button>
+  </div>
+
+  <div class="card">
+    <label><b>3. Received Text:</b></label>
+    <div id="receivedText" class="received-box">Waiting for incoming text...</div>
+    <button onclick="copyReceivedText()" style="background: #34a853; margin-top: 10px;">Copy Received Text</button>
+  </div>
+
+  <script>
+    let peer = null;
+    let conn = null;
+
+    function connectToRoom() {
+      const room = document.getElementById('roomId').value.trim();
+      if (!room) return alert('Enter a room code');
+
+      document.getElementById('status').innerText = 'Status: Connecting...';
+
+      // Initialize PeerJS with a fixed room ID + role
+      peer = new Peer();
+
+      peer.on('open', (id) => {
+        // Try to connect to peer with room ID
+        conn = peer.connect(room);
+        setupConnection(conn);
+
+        // Listen for incoming connection if we are the first device
+        peer.on('connection', (c) => {
+          conn = c;
+          setupConnection(conn);
+        });
+      });
+
+      peer.on('error', (err) => {
+        console.error(err);
+        document.getElementById('status').innerText = 'Status: Connection error. Try again.';
+      });
+    }
+
+    function setupConnection(connection) {
+      connection.on('open', () => {
+        document.getElementById('status').innerText = 'Status: Connected! Ready to transfer text.';
+        document.getElementById('status').className = 'status connected';
+      });
+
+      connection.on('data', (data) => {
+        document.getElementById('receivedText').innerText = data;
+      });
+
+      connection.on('close', () => {
+        document.getElementById('status').innerText = 'Status: Disconnected';
+        document.getElementById('status').className = 'status disconnected';
+      });
+    }
+
+    function sendText() {
+      const text = document.getElementById('textToSend').value;
+      if (conn && conn.open) {
+        conn.send(text);
+        document.getElementById('textToSend').value = '';
+      } else {
+        alert('Phones are not connected yet. Click "Connect Phones" on both devices.');
+      }
+    }
+
+    function copyReceivedText() {
+      const text = document.getElementById('receivedText').innerText;
+      navigator.clipboard.writeText(text).then(() => {
+        alert('Copied to clipboard!');
+      });
+    }
+  </script>
+</body>
+</html>
